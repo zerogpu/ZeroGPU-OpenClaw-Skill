@@ -134,6 +134,22 @@ By default the plugin fetches models from:
 
 You can override this with `MODEL_CATALOG_URL`.
 
+Live inference targets ZeroGPU Responses API by default:
+
+- `https://api.zerogpu.ai/v1/responses`
+
+To enable live inference (instead of mock fallback), send request headers:
+
+- `x-api-key: <user_api_key>`
+- `x-project-id: <project_id>`
+
+You can override endpoint with `INFERENCE_API_URL`.
+
+Optional runtime settings:
+
+- `INFERENCE_TIMEOUT_MS` (default `10000`)
+- `INFERENCE_MAX_RETRIES` (default `2`)
+
 ### Quick checks
 
 ```bash
@@ -147,6 +163,8 @@ curl http://localhost:8787/v1/models
 ```bash
 curl -X POST http://localhost:8787/v1/zerogpu/chat/completions \
   -H "content-type: application/json" \
+  -H "x-api-key: YOUR_ZEROGPU_API_KEY" \
+  -H "x-project-id: YOUR_ZEROGPU_PROJECT_ID" \
   -d '{
     "model":"auto",
     "messages":[

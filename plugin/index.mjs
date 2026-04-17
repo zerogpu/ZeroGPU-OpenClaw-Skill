@@ -11,6 +11,9 @@ const TRACKING_PATH = path.join(__dirname, "tracking-events.jsonl");
 const CATALOG_REFRESH_MS = 60_000;
 const MODEL_CATALOG_URL = process.env.MODEL_CATALOG_URL || "https://api-dashboard.zerogpu.ai/api/models";
 const ESTIMATED_LLM_COST_PER_1K = Number(process.env.ESTIMATED_LLM_COST_PER_1K || 0.01);
+const INFERENCE_API_URL = process.env.INFERENCE_API_URL || "https://api.zerogpu.ai/v1/responses";
+const INFERENCE_TIMEOUT_MS = Number(process.env.INFERENCE_TIMEOUT_MS || 10_000);
+const INFERENCE_MAX_RETRIES = Number(process.env.INFERENCE_MAX_RETRIES || 2);
 
 let catalogCache = { updatedAt: null, models: [] };
 let lastCatalogLoad = 0;
@@ -193,6 +196,97 @@ function buildMockOutput(taskType, messages) {
   }
 }
 
+function getRequestCredentials(req) {
+  const projectId = req.headers["x-project-id"];
+  const auth = req.headers.authorization || req.headers.Authorization;
+  let apiKey = "";
+  if (typeof auth === "string" && auth.toLowerCase().startsWith("bearer ")) {
+    apiKey = auth.slice(7).trim();
+  }
+
+  const headerApiKey = req.headers["x-api-key"];
+  if (!apiKey && typeof headerApiKey === "string" && headerApiKey.trim()) {
+    apiKey = headerApiKey.trim();
+  }
+
+  return {
+    apiKey,
+    projectId: typeof projectId === "string" ? projectId.trim() : "",
+  };
+}
+
+function toResponsesInput(messages) {
+  return (messages || []).map((m) => ({
+    role: m.role || "user",
+    content: String(m.content || ""),
+  }));
+}
+
+async function postInference({ apiKey, projectId, modelId, messages }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), INFERENCE_TIMEOUT_MS);
+  try {
+    const response = await fetch(INFERENCE_API_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "x-project-id": projectId,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        input: toResponsesInput(messages),
+        text: { format: { type: "text" } },
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    let json = {};
+    try {
+      json = text ? JSON.parse(text) : {};
+    } catch {
+      json = {};
+    }
+
+    if (!response.ok) {
+      const detail = json?.error?.message || json?.message || `status ${response.status}`;
+      throw new Error(`Inference API error: ${detail}`);
+    }
+    return json;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function callInferenceWithRetry(payload) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= INFERENCE_MAX_RETRIES; attempt += 1) {
+    try {
+      return await postInference(payload);
+    } catch (error) {
+      lastError = error;
+      if (attempt === INFERENCE_MAX_RETRIES) break;
+    }
+  }
+  throw lastError || new Error("Inference API call failed");
+}
+
+function getContentFromInferenceResponse(json) {
+  if (Array.isArray(json?.output)) {
+    for (const item of json.output) {
+      if (!Array.isArray(item?.content)) continue;
+      for (const chunk of item.content) {
+        if (typeof chunk?.text === "string" && chunk.text.trim()) return chunk.text;
+      }
+    }
+  }
+  if (json?.choices?.[0]?.message?.content) return String(json.choices[0].message.content);
+  if (typeof json?.output_text === "string") return json.output_text;
+  if (typeof json?.text === "string") return json.text;
+  return "";
+}
+
 async function appendTrackingEvent(event) {
   await fs.appendFile(TRACKING_PATH, `${JSON.stringify(event)}\n`, "utf8");
 }
@@ -261,8 +355,25 @@ const server = http.createServer(async (req, res) => {
 
       const startedAt = Date.now();
       const promptTokens = estimateTokens(messages);
-      const completionText = buildMockOutput(taskType, messages);
-      const completionTokens = estimateTokens([{ content: completionText }]);
+      let completionText = "";
+      let completionTokens = 0;
+      const { apiKey, projectId } = getRequestCredentials(req);
+      const shouldUseLiveInference = Boolean(INFERENCE_API_URL && apiKey && projectId);
+
+      if (shouldUseLiveInference) {
+        const inferenceJson = await callInferenceWithRetry({
+          apiKey,
+          projectId,
+          modelId: selectedModel.id,
+          messages,
+        });
+        completionText = getContentFromInferenceResponse(inferenceJson);
+      }
+
+      if (!completionText) {
+        completionText = buildMockOutput(taskType, messages);
+      }
+      completionTokens = estimateTokens([{ content: completionText }]);
       const totalTokens = promptTokens + completionTokens;
       const zerogpuCost = computeZeroGpuCostUsd(selectedModel, promptTokens, completionTokens);
       const estimatedLlmCost = (totalTokens / 1000) * ESTIMATED_LLM_COST_PER_1K;
@@ -275,6 +386,7 @@ const server = http.createServer(async (req, res) => {
         model: selectedModel.id,
         latencyMs,
         totalTokens,
+        inferenceMode: shouldUseLiveInference ? "live" : "mock",
         zerogpuCostUsd: Number(zerogpuCost.toFixed(8)),
         estimatedLlmCostUsd: Number(estimatedLlmCost.toFixed(8)),
         savingsUsd: Number(savings.toFixed(8)),

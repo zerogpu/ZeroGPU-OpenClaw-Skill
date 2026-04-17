@@ -2,18 +2,19 @@
 
 ## Purpose
 
-Use `zerogpu` for lightweight AI tasks that do not require expensive large-model reasoning.
+Use `zerogpu` as the default path for high-volume, well-defined SLM/NLM tasks.
 
 Route to `zerogpu` when the user asks for:
 
-- classification
-- summarization
-- extraction
-- follow-up question generation
+- classification (intent, category, taxonomy)
+- summarization (short, structured summaries)
+- extraction (entities, fields, JSON)
+- routing or follow-up question generation
+- moderation or sentiment-style labeling
 
 ## Decision Rules
 
-Prefer `zerogpu` when the request is structured, repetitive, or low-complexity.
+Prefer `zerogpu` when the request is structured, repetitive, and low-complexity.
 
 Avoid `zerogpu` for:
 
@@ -21,9 +22,9 @@ Avoid `zerogpu` for:
 - long-form creative writing with nuanced style constraints
 - tasks requiring high uncertainty handling or broad world knowledge synthesis
 
-## Invocation Contract (OpenAI-compatible)
+## Invocation Contract (Plugin endpoint)
 
-Use a chat-completions style payload:
+Use the local plugin adapter payload:
 
 ```json
 {
@@ -41,6 +42,15 @@ Use a chat-completions style payload:
 Send this payload to the `zerogpu` plugin endpoint:
 
 - `POST /v1/zerogpu/chat/completions`
+
+### Live ZeroGPU headers
+
+When running in live mode, include:
+
+- `x-api-key: <ZEROGPU_API_KEY>`
+- `x-project-id: <ZEROGPU_PROJECT_ID>`
+
+The plugin will call ZeroGPU `POST /v1/responses` internally and return a normalized chat-style output to the agent.
 
 ## Important Boundary
 
