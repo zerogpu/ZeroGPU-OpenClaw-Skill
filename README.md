@@ -120,7 +120,32 @@ This makes `zerogpu` a practical optimization layer for agent ecosystems rather 
 
 ## Run Locally
 
-From this folder:
+## Recommended User Setup (OpenClaw)
+
+For now, the simplest distribution model is local usage:
+
+1. user clones this repo
+2. user runs the plugin locally
+3. user adds one HTTP tool in OpenClaw that points to localhost
+
+This avoids shared hosting costs and keeps each user's credentials local.
+
+### 1) Clone and start
+
+```bash
+git clone https://github.com/zerogpu/ZeroGPU-OpenClaw-Skill.git
+cd ZeroGPU-OpenClaw-Skill
+npm install
+```
+
+Set credentials in your shell (recommended, server-side only):
+
+```bash
+export ZEROGPU_API_KEY="YOUR_ZEROGPU_API_KEY"
+export ZEROGPU_PROJECT_ID="YOUR_ZEROGPU_PROJECT_ID"
+```
+
+Then start the plugin:
 
 ```bash
 npm start
@@ -149,6 +174,70 @@ Optional runtime settings:
 
 - `INFERENCE_TIMEOUT_MS` (default `10000`)
 - `INFERENCE_MAX_RETRIES` (default `2`)
+- `DEFAULT_CLASSIFICATION_CATEGORIES` (comma-separated allowed labels)
+
+Optional server-side credential defaults (for local dev only):
+
+- `ZEROGPU_API_KEY`
+- `ZEROGPU_PROJECT_ID`
+
+When set, requests can omit `x-api-key` and `x-project-id` headers.
+
+### Safe variable passing (OpenClaw or shell)
+
+Never hardcode keys in config files. Export them in your shell session:
+
+```bash
+export ZEROGPU_API_KEY="YOUR_ZEROGPU_API_KEY"
+export ZEROGPU_PROJECT_ID="YOUR_ZEROGPU_PROJECT_ID"
+```
+
+Then run:
+
+```bash
+npm start
+```
+
+And call the plugin without embedding secrets in request payloads or workspace docs.
+
+### 2) Add OpenClaw tool
+
+Create an HTTP tool in OpenClaw with:
+
+- `name`: `zerogpu_chat`
+- `method`: `POST`
+- `url`: `http://localhost:8787/v1/zerogpu/chat/completions`
+- `headers`:
+  - `content-type: application/json`
+- `body`:
+
+```json
+{
+  "model": "auto",
+  "messages": [
+    { "role": "user", "content": "{{user_input}}" }
+  ]
+}
+```
+
+If `ZEROGPU_API_KEY` and `ZEROGPU_PROJECT_ID` are exported before `npm start`, you do not need to hardcode secrets in tool headers.
+
+### 3) Verify quickly
+
+```bash
+curl http://localhost:8787/health
+```
+
+```bash
+curl -X POST http://localhost:8787/v1/zerogpu/chat/completions \
+  -H "content-type: application/json" \
+  -d '{
+    "model":"auto",
+    "messages":[
+      {"role":"user","content":"Summarize this feature request into 3 bullets."}
+    ]
+  }'
+```
 
 ### Quick checks
 
