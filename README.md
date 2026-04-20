@@ -175,6 +175,7 @@ Optional runtime settings:
 - `INFERENCE_TIMEOUT_MS` (default `10000`)
 - `INFERENCE_MAX_RETRIES` (default `2`)
 - `DEFAULT_CLASSIFICATION_CATEGORIES` (comma-separated allowed labels)
+- `DEFAULT_SHOW_SAVINGS` (`true` by default; set `false` to disable auto savings line in text outputs)
 
 Optional server-side credential defaults (for local dev only):
 
@@ -221,6 +222,33 @@ Create an HTTP tool in OpenClaw with:
 ```
 
 If `ZEROGPU_API_KEY` and `ZEROGPU_PROJECT_ID` are exported before `npm start`, you do not need to hardcode secrets in tool headers.
+
+### Extraction and GLiNER notes
+
+For `gliner2-base-v1`, the upstream API expects a `usecase` and often either `schema` or `labels`.
+
+This plugin now auto-handles missing `usecase` for GLiNER models, but you can pass explicit fields for better control:
+
+```json
+{
+  "model": "auto",
+  "messages": [
+    { "role": "user", "content": "Extract contact fields from this signature..." }
+  ],
+  "metadata": { "taskTypeHint": "extraction" },
+  "usecase": "json",
+  "schema": {
+    "contact": [
+      "name::str::Full name",
+      "title::str::Job title",
+      "company::str::Company name",
+      "phone::str::Phone number",
+      "email::str::Email address",
+      "address::str::Office address"
+    ]
+  }
+}
+```
 
 ### 3) Verify quickly
 

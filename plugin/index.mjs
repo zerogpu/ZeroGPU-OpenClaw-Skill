@@ -16,6 +16,9 @@ const INFERENCE_TIMEOUT_MS = Number(process.env.INFERENCE_TIMEOUT_MS || 10_000);
 const INFERENCE_MAX_RETRIES = Number(process.env.INFERENCE_MAX_RETRIES || 2);
 const DEFAULT_CLASSIFICATION_CATEGORIES = (process.env.DEFAULT_CLASSIFICATION_CATEGORIES ||
   "Technology,Business,Health,Sports,Entertainment,Politics,Finance,Education,Lifestyle").split(",");
+const DEFAULT_API_KEY = process.env.ZEROGPU_API_KEY || "";
+const DEFAULT_PROJECT_ID = process.env.ZEROGPU_PROJECT_ID || "";
+const DEFAULT_SHOW_SAVINGS = String(process.env.DEFAULT_SHOW_SAVINGS || "true").toLowerCase() !== "false";
 
 let catalogCache = { updatedAt: null, models: [] };
 let lastCatalogLoad = 0;
@@ -137,11 +140,27 @@ function detectTaskType(messages, taskTypeHint) {
   return "summarization";
 }
 
-function selectModel(catalog, taskType) {
+function selectModels(catalog, taskType, messages) {
   const candidates = catalog.models.filter((m) => (m.supportedTaskTypes || []).includes(taskType));
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) return [];
+  const userText = (messages || [])
+    .filter((m) => m?.role === "user")
+    .map((m) => String(m?.content || ""))
+    .join(" ")
+    .toLowerCase();
+
+  if (taskType === "classification" && userText.includes("iab")) {
+    candidates.sort((a, b) => {
+      const aIab = String(a.id || "").toLowerCase().includes("iab") ? 1 : 0;
+      const bIab = String(b.id || "").toLowerCase().includes("iab") ? 1 : 0;
+      if (aIab !== bIab) return bIab - aIab;
+      return getBlendedCostPer1k(a) - getBlendedCostPer1k(b) || a.avgLatencyMs - b.avgLatencyMs;
+    });
+    return candidates;
+  }
+
   candidates.sort((a, b) => getBlendedCostPer1k(a) - getBlendedCostPer1k(b) || a.avgLatencyMs - b.avgLatencyMs);
-  return candidates[0];
+  return candidates;
 }
 
 function getBlendedCostPer1k(model) {
@@ -212,8 +231,8 @@ function getRequestCredentials(req) {
   }
 
   return {
-    apiKey,
-    projectId: typeof projectId === "string" ? projectId.trim() : "",
+    apiKey: apiKey || DEFAULT_API_KEY,
+    projectId: (typeof projectId === "string" ? projectId.trim() : "") || DEFAULT_PROJECT_ID,
   };
 }
 
@@ -222,6 +241,40 @@ function toResponsesInput(messages) {
     role: m.role || "user",
     content: String(m.content || ""),
   }));
+}
+
+function buildInferencePayload({ modelId, messages, body, taskType }) {
+  const payload = {
+    model: modelId,
+    input: toResponsesInput(messages),
+    text: { format: { type: "text" } },
+  };
+
+  const isGliner = String(modelId || "").toLowerCase().includes("gliner2");
+  if (!isGliner) return payload;
+
+  const providedUsecase = typeof body?.usecase === "string" ? body.usecase : "";
+  let usecase = providedUsecase;
+  if (!usecase) {
+    if (body?.schema) usecase = "json";
+    else if (body?.labels) usecase = "ner";
+    else if (taskType === "classification") usecase = "classification";
+    else usecase = "json";
+  }
+
+  payload.usecase = usecase;
+  if (body?.schema) payload.schema = body.schema;
+  if (body?.labels) payload.labels = body.labels;
+  if (typeof body?.threshold === "number") payload.threshold = body.threshold;
+
+  // Fallback for extraction requests with no gliner-specific hints.
+  if (!payload.schema && !payload.labels && taskType === "extraction") {
+    payload.usecase = "ner";
+    payload.labels = ["person", "organization", "email", "phone", "address", "date", "amount"];
+    payload.threshold = 0.3;
+  }
+
+  return payload;
 }
 
 function ensureClassificationSystemMessage(messages, taskType) {
@@ -250,7 +303,55 @@ function ensureClassificationSystemMessage(messages, taskType) {
   return normalized;
 }
 
-async function postInference({ apiKey, projectId, modelId, messages }) {
+function parseJsonObject(text) {
+  if (typeof text !== "string") return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeClassificationOutput(content, taskType) {
+  if (taskType !== "classification") return content;
+  const parsed = parseJsonObject(content);
+  if (!parsed) return content;
+  if (typeof parsed.category === "string") return content;
+
+  const categories = new Set(DEFAULT_CLASSIFICATION_CATEGORIES.map((c) => c.trim()).filter(Boolean));
+  const scored = Object.entries(parsed)
+    .filter(([, v]) => typeof v === "number" && Number.isFinite(v))
+    .filter(([k]) => {
+      const key = String(k || "").trim();
+      if (!key) return false;
+      const keyLower = key.toLowerCase();
+      if (
+        keyLower.includes("classify") ||
+        keyLower.includes("return") ||
+        keyLower.includes("allowed categories") ||
+        keyLower.includes("strict json")
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => b[1] - a[1]);
+  if (scored.length === 0) return content;
+
+  const [bestCategory, bestScore] = scored[0];
+  return JSON.stringify(
+    {
+      category: bestCategory,
+      confidence: Number(bestScore.toFixed(6)),
+      source: categories.has(bestCategory) ? "normalized_probability_map" : "normalized_top_score",
+    },
+    null,
+    2
+  );
+}
+
+async function postInference({ apiKey, projectId, modelId, messages, body, taskType }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), INFERENCE_TIMEOUT_MS);
   try {
@@ -261,11 +362,7 @@ async function postInference({ apiKey, projectId, modelId, messages }) {
         "x-api-key": apiKey,
         "x-project-id": projectId,
       },
-      body: JSON.stringify({
-        model: modelId,
-        input: toResponsesInput(messages),
-        text: { format: { type: "text" } },
-      }),
+      body: JSON.stringify(buildInferencePayload({ modelId, messages, body, taskType })),
       signal: controller.signal,
     });
 
@@ -337,8 +434,8 @@ async function parseJsonBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
-function toOpenAiLikeResponse({ modelId, content, promptTokens, completionTokens }) {
-  return {
+function toOpenAiLikeResponse({ modelId, content, promptTokens, completionTokens, zerogpuMeta }) {
+  const response = {
     id: `zgpu_${Date.now()}`,
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
@@ -356,6 +453,26 @@ function toOpenAiLikeResponse({ modelId, content, promptTokens, completionTokens
       total_tokens: promptTokens + completionTokens,
     },
   };
+  if (zerogpuMeta) response.zerogpu = zerogpuMeta;
+  return response;
+}
+
+function shouldAppendSavingsToContent(body, content) {
+  const override = body?.metadata?.showSavings;
+  const show = typeof override === "boolean" ? override : DEFAULT_SHOW_SAVINGS;
+  if (!show) return false;
+  const trimmed = String(content || "").trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) return false;
+  return true;
+}
+
+function buildSavingsPostamble({ event, suggestionModel }) {
+  const savingsLine =
+    `Savings this call: $${event.savingsUsd.toFixed(6)} ` +
+    `(ZeroGPU $${event.zerogpuCostUsd.toFixed(6)} vs est. LLM $${event.estimatedLlmCostUsd.toFixed(6)}).`;
+  if (!suggestionModel) return savingsLine;
+  return `${savingsLine}\nTry also with model: ${suggestionModel}.`;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -376,7 +493,9 @@ const server = http.createServer(async (req, res) => {
       const messages = body.messages || [];
       const taskType = detectTaskType(messages, body?.metadata?.taskTypeHint);
       const catalog = await loadCatalog();
-      const selectedModel = selectModel(catalog, taskType);
+      const rankedModels = selectModels(catalog, taskType, messages);
+      const selectedModel = rankedModels[0];
+      const suggestionModel = rankedModels[1]?.id || null;
       if (!selectedModel) {
         return sendJson(res, 400, { error: `No model available for task type: ${taskType}` });
       }
@@ -395,6 +514,8 @@ const server = http.createServer(async (req, res) => {
           projectId,
           modelId: selectedModel.id,
           messages: preparedMessages,
+          body,
+          taskType,
         });
         completionText = getContentFromInferenceResponse(inferenceJson);
       }
@@ -402,6 +523,7 @@ const server = http.createServer(async (req, res) => {
       if (!completionText) {
         completionText = buildMockOutput(taskType, preparedMessages);
       }
+      completionText = normalizeClassificationOutput(completionText, taskType);
       completionTokens = estimateTokens([{ content: completionText }]);
       const totalTokens = promptTokens + completionTokens;
       const zerogpuCost = computeZeroGpuCostUsd(selectedModel, promptTokens, completionTokens);
@@ -421,6 +543,10 @@ const server = http.createServer(async (req, res) => {
         savingsUsd: Number(savings.toFixed(8)),
       };
 
+      if (shouldAppendSavingsToContent(body, completionText)) {
+        completionText = `${completionText}\n\n${buildSavingsPostamble({ event, suggestionModel })}`;
+      }
+
       appendTrackingEvent(event).catch(() => {});
 
       return sendJson(
@@ -431,6 +557,15 @@ const server = http.createServer(async (req, res) => {
           content: completionText,
           promptTokens,
           completionTokens,
+          zerogpuMeta: {
+            taskType,
+            selectedModel: selectedModel.id,
+            suggestionModel,
+            inferenceMode: event.inferenceMode,
+            zerogpuCostUsd: event.zerogpuCostUsd,
+            estimatedLlmCostUsd: event.estimatedLlmCostUsd,
+            savingsUsd: event.savingsUsd,
+          },
         })
       );
     }
