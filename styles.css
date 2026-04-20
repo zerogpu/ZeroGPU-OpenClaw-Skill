@@ -1,11 +1,11 @@
 :root {
-  --bg: #f7f8fb;
+  --bg: #f4f9f7;
   --surface: #ffffff;
   --text: #12151c;
   --muted: #5d6577;
-  --brand: #6d5efc;
-  --brand-2: #3db9ff;
-  --border: #e6e9f0;
+  --brand: #00cc66;
+  --brand-2: #00bfff;
+  --border: #dfe9e4;
 }
 
 * {
@@ -61,8 +61,15 @@ body {
   background: linear-gradient(135deg, var(--brand), var(--brand-2));
 }
 
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
 .hero {
   padding: 88px 0 52px;
+  background: linear-gradient(135deg, rgba(0, 204, 102, 0.08), rgba(0, 191, 255, 0.08));
 }
 
 .hero-inner {
@@ -121,6 +128,58 @@ h1 span {
   color: var(--text);
   border-color: var(--border);
   background: var(--surface);
+}
+
+.install-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 12px;
+}
+
+.install-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.install-label {
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+#installPrompt {
+  width: 100%;
+  min-height: 260px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font: 0.9rem/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: #fcfffd;
+  color: var(--text);
+  resize: vertical;
+}
+
+.install-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#copyStatus {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.manual-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.manual-list li {
+  margin-bottom: 8px;
 }
 
 .metrics {
@@ -232,6 +291,10 @@ thead th {
   gap: 12px;
 }
 
+.models-section .section-head p {
+  color: var(--muted);
+}
+
 .faq details {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -273,6 +336,10 @@ thead th {
   }
 
   .steps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .install-grid {
     grid-template-columns: 1fr;
   }
 }
