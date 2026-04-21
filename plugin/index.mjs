@@ -140,7 +140,17 @@ function detectTaskType(messages, taskTypeHint) {
   return "summarization";
 }
 
-function selectModels(catalog, taskType, messages) {
+function selectModels(catalog, taskType, messages, requestedModel) {
+  const requested = String(requestedModel || "").trim();
+  const hasRequested = requested && requested.toLowerCase() !== "auto";
+  if (hasRequested) {
+    const exact = catalog.models.find((m) => String(m.id || "").toLowerCase() === requested.toLowerCase());
+    if (exact) {
+      const others = catalog.models.filter((m) => m.id !== exact.id);
+      return [exact, ...others];
+    }
+  }
+
   const candidates = catalog.models.filter((m) => (m.supportedTaskTypes || []).includes(taskType));
   if (candidates.length === 0) return [];
   const userText = (messages || [])
@@ -277,9 +287,10 @@ function buildInferencePayload({ modelId, messages, body, taskType }) {
   return payload;
 }
 
-function ensureClassificationSystemMessage(messages, taskType) {
+function ensureClassificationSystemMessage(messages, taskType, selectedModelId) {
   const normalized = Array.isArray(messages) ? [...messages] : [];
   if (taskType !== "classification") return normalized;
+  if (String(selectedModelId || "").toLowerCase().includes("iab")) return normalized;
 
   const hasCategorySystemPrompt = normalized.some((m) => {
     if (m?.role !== "system") return false;
@@ -493,14 +504,14 @@ const server = http.createServer(async (req, res) => {
       const messages = body.messages || [];
       const taskType = detectTaskType(messages, body?.metadata?.taskTypeHint);
       const catalog = await loadCatalog();
-      const rankedModels = selectModels(catalog, taskType, messages);
+      const rankedModels = selectModels(catalog, taskType, messages, body?.model);
       const selectedModel = rankedModels[0];
       const suggestionModel = rankedModels[1]?.id || null;
       if (!selectedModel) {
         return sendJson(res, 400, { error: `No model available for task type: ${taskType}` });
       }
 
-      const preparedMessages = ensureClassificationSystemMessage(messages, taskType);
+      const preparedMessages = ensureClassificationSystemMessage(messages, taskType, selectedModel?.id);
       const startedAt = Date.now();
       const promptTokens = estimateTokens(preparedMessages);
       let completionText = "";
