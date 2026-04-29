@@ -111,6 +111,7 @@ Optional environment variables:
 - `INFERENCE_TIMEOUT_MS` defaults to `10000`.
 - `INFERENCE_MAX_RETRIES` defaults to `2`.
 - `DEFAULT_SHOW_SAVINGS` defaults to `true`.
+- `ENABLE_AUTO_TASK_INFERENCE` defaults to `false`. Set `true` to enable keyword-based task inference for `zerogpu/auto`.
 
 `ZEROGPU_API_KEY` and `ZEROGPU_PROJECT_ID` are only supported as local development fallbacks. Hosted deployments should rely on per-request credentials from OpenCLAW.
 

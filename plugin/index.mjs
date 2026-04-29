@@ -14,6 +14,7 @@ const ESTIMATED_LLM_COST_PER_1K = Number(process.env.ESTIMATED_LLM_COST_PER_1K |
 const INFERENCE_API_URL = process.env.INFERENCE_API_URL || "https://api.zerogpu.ai/v1/responses";
 const INFERENCE_TIMEOUT_MS = Number(process.env.INFERENCE_TIMEOUT_MS || 10_000);
 const INFERENCE_MAX_RETRIES = Number(process.env.INFERENCE_MAX_RETRIES || 2);
+const ENABLE_AUTO_TASK_INFERENCE = String(process.env.ENABLE_AUTO_TASK_INFERENCE || "false").toLowerCase() === "true";
 const DEFAULT_CLASSIFICATION_CATEGORIES = (process.env.DEFAULT_CLASSIFICATION_CATEGORIES ||
   "Technology,Business,Health,Sports,Entertainment,Politics,Finance,Education,Lifestyle").split(",");
 const DEFAULT_API_KEY = process.env.ZEROGPU_API_KEY || "";
@@ -179,7 +180,11 @@ function resolveAlias(model) {
 
 function taskTypeFromModel(model, messages, taskTypeHint) {
   const alias = resolveAlias(model);
-  return alias?.taskType || detectTaskType(messages, taskTypeHint);
+  if (alias?.taskType) return alias.taskType;
+  if (taskTypeHint) return taskTypeHint;
+  // Alias-first mode: only infer from text when explicitly enabled.
+  if (ENABLE_AUTO_TASK_INFERENCE) return detectTaskType(messages, taskTypeHint);
+  return "summarization";
 }
 
 function requestedModelForSelection(model) {
