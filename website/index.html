@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZeroGPU Routing</title>
+    <title>ZeroGPU Router</title>
     <meta
       name="description"
-      content="ZeroGPU Routing helps agents route lightweight tasks to small models, reduce cost, and track savings."
+      content="ZeroGPU Router helps agents route lightweight tasks to small models, reduce cost, and track savings."
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -15,7 +15,7 @@
       <div class="container topbar-inner">
         <div class="brand">
           <img class="brand-logo" src="https://zerogpu.ai/favicon.png" alt="ZeroGPU" />
-          <span>ZeroGPU Routing</span>
+          <span>ZeroGPU Router</span>
         </div>
         <a class="btn btn-ghost" href="https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin">GitHub</a>
       </div>
@@ -25,7 +25,7 @@
       <section class="hero">
         <div class="container hero-inner">
           <p class="eyebrow">Cost-aware AI tooling</p>
-          <h1>Cut agent costs with <span>ZeroGPU Routing</span></h1>
+          <h1>Cut agent costs with <span>ZeroGPU Router</span></h1>
           <p class="hero-copy">
             Route classification, summarization, extraction, and follow-up generation to small models automatically.
             Keep LLMs for hard tasks. Track savings on every call.
@@ -76,7 +76,8 @@
             <article class="install-card">
               <p class="install-label">Manual setup (if you prefer)</p>
               <ol class="manual-list">
-                <li>Run the one-line `curl | bash` installer.</li>
+                <li>Run `openclaw plugins install zerogpu-router`.</li>
+                <li>Run `openclaw providers setup zerogpu`.</li>
                 <li>Enter the user's ZeroGPU API key and project ID when prompted.</li>
                 <li>Use `zerogpu/auto` or a task alias such as `zerogpu/summarize`.</li>
                 <li>Confirm dashboard events on the hosted adapter after a live call.</li>
@@ -88,7 +89,7 @@
 
       <section id="how" class="how">
         <div class="container">
-          <h2>How ZeroGPU Routing works</h2>
+          <h2>How ZeroGPU Router works</h2>
           <div class="steps-grid">
             <article class="step-card">
               <p class="step-index">01</p>
@@ -200,7 +201,7 @@
 
     <footer class="footer">
       <div class="container footer-inner">
-        <p>ZeroGPU Routing</p>
+        <p>ZeroGPU Router</p>
         <a href="https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin">View repository</a>
       </div>
     </footer>

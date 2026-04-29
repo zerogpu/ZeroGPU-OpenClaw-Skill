@@ -29,19 +29,24 @@ const sampleRows = [
   },
 ];
 
-const installPrompt = `Set up openclaw+zerogpu as my OpenCLAW provider.
+const installPrompt = `Set up ZeroGPU Router as my OpenCLAW provider.
 
 Steps to execute:
-1) Run the production installer
-- curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
+1) Install the plugin
+- openclaw plugins install zerogpu-router
 
-2) Enter my ZeroGPU API key and project ID when prompted.
+2) Configure the provider
+- openclaw providers setup zerogpu
+- Enter my ZeroGPU API key and project ID when prompted.
 
-3) Verify provider
+3) Restart the gateway
+- openclaw gateway restart
+
+4) Verify provider
 - openclaw config get models.providers.zerogpu
 - openclaw config get agents.defaults.model.primary
 
-4) Test with a small summarization request using zerogpu/auto.`;
+5) Test with a small summarization request using zerogpu/auto.`;
 
 function usd(v) {
   return `$${v.toFixed(6)}`;

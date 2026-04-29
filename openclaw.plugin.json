@@ -1,0 +1,32 @@
+{
+  "id": "zerogpu-router",
+  "name": "ZeroGPU Router",
+  "version": "0.1.0",
+  "description": "Route OpenCLAW lightweight tasks to ZeroGPU through a hosted OpenAI-compatible provider adapter.",
+  "author": "ZeroGPU",
+  "homepage": "https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin",
+  "providers": [
+    "zerogpu"
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "default": "https://zerogpu-openclaw-plugin.onrender.com/v1",
+        "description": "ZeroGPU OpenCLAW adapter /v1 base URL."
+      }
+    }
+  },
+  "uiHints": {
+    "baseUrl": {
+      "label": "Adapter URL",
+      "placeholder": "https://zerogpu-openclaw-plugin.onrender.com/v1",
+      "advanced": true
+    }
+  },
+  "skills": [
+    "skills/zerogpu"
+  ]
+}

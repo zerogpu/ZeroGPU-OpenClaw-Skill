@@ -1,4 +1,4 @@
-# openclaw+zerogpu Provider Spec
+# ZeroGPU Router Provider Spec
 
 ## Primary Endpoints
 

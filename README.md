@@ -1,4 +1,4 @@
-# openclaw+zerogpu
+# ZeroGPU Router
 
 Hosted OpenAI-compatible provider adapter for routing OpenCLAW tasks to ZeroGPU.
 
@@ -11,20 +11,28 @@ The adapter decodes each user's ZeroGPU credentials from the OpenCLAW provider `
 
 ## Quick Start For Users
 
-Run the production installer in your OpenCLAW shell:
+After the npm package is published, install and configure with OpenCLAW's native plugin/provider flow:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
+openclaw plugins install zerogpu-router
+openclaw providers setup zerogpu
+openclaw gateway restart
 ```
 
-The installer asks for:
+The setup wizard asks for:
 
 - `ZeroGPU API key`
 - `ZeroGPU project ID`
 
 It stores those credentials in OpenCLAW provider config as an encoded provider token. The hosted adapter stays stateless.
 
-If OpenCLAW Cloud cannot restart the gateway automatically, use:
+Until the npm package is published, use the hosted installer fallback:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
+```
+
+For OpenCLAW Cloud environments where restart is handled by the UI:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | SKIP_GATEWAY_RESTART=1 bash
@@ -32,18 +40,18 @@ curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/mai
 
 Then restart or reload the gateway from the OpenCLAW Cloud UI.
 
-## Clone-Based Setup
+## Local Plugin Development
 
-If you want to inspect or modify the installer locally:
+If you want to inspect or modify the plugin locally:
 
 ```bash
 git clone https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin.git
 cd ZeroGPU-OpenClaw-Plugin
 npm install
-npm run setup:openclaw
+npm run check
 ```
 
-You can pre-seed values for non-interactive environments:
+You can still run the fallback setup helper locally:
 
 ```bash
 ZEROGPU_API_KEY="YOUR_ZEROGPU_API_KEY" \
@@ -118,6 +126,13 @@ The adapter keeps the dashboard idea from the original prototype:
 Runtime events are written to `plugin/tracking-events.jsonl`. That file is generated on demand and should not be committed.
 
 ## Configuration
+
+The plugin package includes:
+
+- `openclaw.plugin.json` for OpenCLAW plugin metadata.
+- `openclaw-plugin.cjs` for provider registration and setup wizard support.
+- `skills/zerogpu/SKILL.md` for OpenCLAW skill metadata.
+- `scripts/setup-openclaw-provider.sh` as a fallback no-clone installer.
 
 Optional environment variables:
 

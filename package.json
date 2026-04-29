@@ -1,13 +1,43 @@
 {
-  "name": "openclaw-zerogpu",
+  "name": "zerogpu-router",
   "version": "0.1.0",
-  "private": true,
-  "description": "OpenCLAW + ZeroGPU hosted provider adapter with routing and savings tracking",
+  "private": false,
+  "description": "ZeroGPU Router for OpenCLAW with hosted routing and task offload",
   "type": "module",
+  "main": "plugin/index.mjs",
+  "openclaw": {
+    "extensions": [
+      "./openclaw-plugin.cjs"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.2.0"
+    }
+  },
+  "files": [
+    "openclaw-plugin.cjs",
+    "openclaw.plugin.json",
+    "plugin/index.mjs",
+    "plugin/model-catalog.json",
+    "scripts/",
+    "skills/",
+    "README.md",
+    "PLUGIN_SPEC.md",
+    "SKILL.md"
+  ],
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "openclaw-provider",
+    "zerogpu",
+    "llm-router",
+    "task-offload",
+    "openai-compatible"
+  ],
   "scripts": {
     "start": "node plugin/index.mjs",
+    "plugin:check": "node --check openclaw-plugin.cjs",
     "postinstall": "node --check plugin/index.mjs",
-    "check": "node --check plugin/index.mjs",
+    "check": "node --check plugin/index.mjs && node --check openclaw-plugin.cjs",
     "render-build": "npm install",
     "setup:openclaw": "bash scripts/setup-openclaw-provider.sh"
   }
