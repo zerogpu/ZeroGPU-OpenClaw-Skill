@@ -35,6 +35,48 @@ SKIP_GATEWAY_RESTART=1 ADAPTER_BASE_URL="https://YOUR_RENDER_URL/v1" npm run set
 
 Then restart or reload the gateway from the OpenCLAW Cloud UI.
 
+## Quick Start Without Clone
+
+Users can configure OpenCLAW directly against the hosted adapter without cloning this repo.
+
+1) Export credentials in the shell:
+
+```bash
+export ZEROGPU_API_KEY="YOUR_ZEROGPU_API_KEY"
+export ZEROGPU_PROJECT_ID="YOUR_ZEROGPU_PROJECT_ID"
+```
+
+2) Generate the provider token and set OpenCLAW config:
+
+```bash
+TOKEN="$(node -e 'const payload={apiKey:process.env.ZEROGPU_API_KEY,projectId:process.env.ZEROGPU_PROJECT_ID};process.stdout.write("zgpu-user-"+Buffer.from(JSON.stringify(payload)).toString("base64url"));')"
+
+openclaw config set models.providers.zerogpu "$(cat <<EOF
+{
+  "baseUrl": "https://YOUR_RENDER_URL/v1",
+  "api": "openai-completions",
+  "apiKey": "$TOKEN",
+  "models": [
+    { "id": "zerogpu/auto", "name": "ZeroGPU Auto" },
+    { "id": "zerogpu/chat", "name": "ZeroGPU Chat" },
+    { "id": "zerogpu/chat-thinking", "name": "ZeroGPU Chat Thinking" },
+    { "id": "zerogpu/summarize", "name": "ZeroGPU Summarize" },
+    { "id": "zerogpu/classify", "name": "ZeroGPU Classify" },
+    { "id": "zerogpu/extract", "name": "ZeroGPU Extract" },
+    { "id": "zerogpu/followups", "name": "ZeroGPU Follow-up Questions" }
+  ]
+}
+EOF
+)"
+openclaw config set agents.defaults.model.primary zerogpu/auto
+```
+
+3) Restart the gateway (or reload in OpenCLAW Cloud UI):
+
+```bash
+openclaw gateway restart
+```
+
 ## Deploy The Adapter
 
 Render is the fastest hosted path:
