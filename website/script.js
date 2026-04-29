@@ -32,14 +32,10 @@ const sampleRows = [
 const installPrompt = `Set up openclaw+zerogpu as my OpenCLAW provider.
 
 Steps to execute:
-1) Clone and install
-- git clone https://github.com/zerogpu/openclaw-zerogpu.git
-- cd openclaw-zerogpu
-- npm install
+1) Run the production installer
+- curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
 
-2) Configure OpenCLAW provider
-- ADAPTER_BASE_URL="https://YOUR_RENDER_URL/v1" npm run setup:openclaw
-- Enter my ZeroGPU API key and project ID when prompted.
+2) Enter my ZeroGPU API key and project ID when prompted.
 
 3) Verify provider
 - openclaw config get models.providers.zerogpu

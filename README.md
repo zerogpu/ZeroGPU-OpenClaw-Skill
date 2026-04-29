@@ -11,70 +11,44 @@ The adapter decodes each user's ZeroGPU credentials from the OpenCLAW provider `
 
 ## Quick Start For Users
 
-Clone the repo inside your OpenCLAW environment and run the setup helper:
+Run the production installer in your OpenCLAW shell:
 
 ```bash
-git clone https://github.com/zerogpu/openclaw-zerogpu.git
-cd openclaw-zerogpu
-npm install
-ADAPTER_BASE_URL="https://zerogpu-openclaw-plugin.onrender.com/v1" npm run setup:openclaw
+curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
 ```
 
-The script asks for:
+The installer asks for:
 
 - `ZeroGPU API key`
 - `ZeroGPU project ID`
 
 It stores those credentials in OpenCLAW provider config as an encoded provider token. The hosted adapter stays stateless.
 
-If OpenCLAW Cloud cannot restart the gateway automatically, run:
+If OpenCLAW Cloud cannot restart the gateway automatically, use:
 
 ```bash
-SKIP_GATEWAY_RESTART=1 ADAPTER_BASE_URL="https://zerogpu-openclaw-plugin.onrender.com/v1" npm run setup:openclaw
+curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | SKIP_GATEWAY_RESTART=1 bash
 ```
 
 Then restart or reload the gateway from the OpenCLAW Cloud UI.
 
-## Quick Start Without Clone
+## Clone-Based Setup
 
-Users can configure OpenCLAW directly against the hosted adapter without cloning this repo.
-
-1) Export credentials in the shell:
+If you want to inspect or modify the installer locally:
 
 ```bash
-export ZEROGPU_API_KEY="YOUR_ZEROGPU_API_KEY"
-export ZEROGPU_PROJECT_ID="YOUR_ZEROGPU_PROJECT_ID"
+git clone https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin.git
+cd ZeroGPU-OpenClaw-Plugin
+npm install
+npm run setup:openclaw
 ```
 
-2) Generate the provider token and set OpenCLAW config:
+You can pre-seed values for non-interactive environments:
 
 ```bash
-TOKEN="$(node -e 'const payload={apiKey:process.env.ZEROGPU_API_KEY,projectId:process.env.ZEROGPU_PROJECT_ID};process.stdout.write("zgpu-user-"+Buffer.from(JSON.stringify(payload)).toString("base64url"));')"
-
-openclaw config set models.providers.zerogpu "$(cat <<EOF
-{
-  "baseUrl": "https://zerogpu-openclaw-plugin.onrender.com/v1",
-  "api": "openai-completions",
-  "apiKey": "$TOKEN",
-  "models": [
-    { "id": "zerogpu/auto", "name": "ZeroGPU Auto" },
-    { "id": "zerogpu/chat", "name": "ZeroGPU Chat" },
-    { "id": "zerogpu/chat-thinking", "name": "ZeroGPU Chat Thinking" },
-    { "id": "zerogpu/summarize", "name": "ZeroGPU Summarize" },
-    { "id": "zerogpu/classify", "name": "ZeroGPU Classify" },
-    { "id": "zerogpu/extract", "name": "ZeroGPU Extract" },
-    { "id": "zerogpu/followups", "name": "ZeroGPU Follow-up Questions" }
-  ]
-}
-EOF
-)"
-openclaw config set agents.defaults.model.primary zerogpu/auto
-```
-
-3) Restart the gateway (or reload in OpenCLAW Cloud UI):
-
-```bash
-openclaw gateway restart
+ZEROGPU_API_KEY="YOUR_ZEROGPU_API_KEY" \
+ZEROGPU_PROJECT_ID="YOUR_ZEROGPU_PROJECT_ID" \
+npm run setup:openclaw
 ```
 
 ## Deploy The Adapter

@@ -6,7 +6,12 @@ if ! command -v openclaw >/dev/null 2>&1; then
   exit 1
 fi
 
-ADAPTER_BASE_URL="${ADAPTER_BASE_URL:-https://zerogpu-openclaw.onrender.com/v1}"
+if ! command -v node >/dev/null 2>&1; then
+  echo "node is not installed or not on PATH"
+  exit 1
+fi
+
+ADAPTER_BASE_URL="${ADAPTER_BASE_URL:-https://zerogpu-openclaw-plugin.onrender.com/v1}"
 PRIMARY_MODEL="${PRIMARY_MODEL:-zerogpu/auto}"
 ZEROGPU_API_KEY="${ZEROGPU_API_KEY:-}"
 ZEROGPU_PROJECT_ID="${ZEROGPU_PROJECT_ID:-}"
@@ -67,3 +72,7 @@ echo "OpenCLAW configured for ZeroGPU."
 echo "Provider: models.providers.zerogpu"
 echo "Primary model: ${PRIMARY_MODEL}"
 echo "Credentials are stored in OpenCLAW provider config, not in the hosted adapter."
+echo
+echo "Verify with:"
+echo "  openclaw config get models.providers.zerogpu"
+echo "  openclaw config get agents.defaults.model.primary"
