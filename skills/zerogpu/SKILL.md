@@ -1,6 +1,6 @@
 ---
 name: zerogpu
-description: ZeroGPU Router for OpenCLAW. Route lightweight tasks like summarization, classification, extraction, and follow-up generation through ZeroGPU using zerogpu/auto or task-specific model aliases.
+description: ZeroGPU Router for OpenCLAW. Keep the user's normal primary model and offload lightweight tasks to ZeroGPU tools for summarization, classification, extraction, and follow-up generation.
 metadata: {"openclaw":{"requires":{"bins":["openclaw"]},"homepage":"https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin"}}
 ---
 
@@ -14,7 +14,16 @@ Use ZeroGPU for well-scoped tasks that do not need a large reasoning model:
 - follow-up question generation
 - lightweight chat
 
-## Model Aliases
+## Tools And Model Aliases
+
+Prefer tools when the user's primary model is not ZeroGPU:
+
+- `zerogpu_summarize`
+- `zerogpu_classify`
+- `zerogpu_extract`
+- `zerogpu_followups`
+
+Model aliases are also available for explicit model selection:
 
 - `zerogpu/auto`
 - `zerogpu/summarize`
@@ -24,7 +33,7 @@ Use ZeroGPU for well-scoped tasks that do not need a large reasoning model:
 - `zerogpu/chat`
 - `zerogpu/chat-thinking`
 
-Prefer task-specific aliases when intent is clear. Use `zerogpu/auto` as the default ZeroGPU route.
+Do not make ZeroGPU the global default model unless the user explicitly asks. Keep normal OpenCLAW models such as `nearai/auto` as the primary brain, and use ZeroGPU as task offload.
 
 ## Setup
 
@@ -32,11 +41,16 @@ Production install:
 
 ```bash
 openclaw plugins install zerogpu-router
-openclaw providers setup zerogpu
 openclaw gateway restart
 ```
 
-The setup wizard asks for the user's ZeroGPU API key and project ID, then writes a standard OpenAI-compatible provider entry for the hosted adapter.
+Then configure credentials:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
+```
+
+The setup script asks for the user's ZeroGPU API key and project ID, then writes a standard OpenAI-compatible provider entry for the hosted adapter without changing the primary model.
 
 ## Privacy
 

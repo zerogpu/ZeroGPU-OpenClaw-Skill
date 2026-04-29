@@ -13,6 +13,7 @@ fi
 
 ADAPTER_BASE_URL="${ADAPTER_BASE_URL:-https://zerogpu-openclaw-plugin.onrender.com/v1}"
 PRIMARY_MODEL="${PRIMARY_MODEL:-zerogpu/auto}"
+SET_ZEROGPU_AS_DEFAULT="${SET_ZEROGPU_AS_DEFAULT:-0}"
 ZEROGPU_API_KEY="${ZEROGPU_API_KEY:-}"
 ZEROGPU_PROJECT_ID="${ZEROGPU_PROJECT_ID:-}"
 
@@ -59,7 +60,13 @@ EOF
 )"
 
 openclaw config set models.providers.zerogpu "$provider_json"
-openclaw config set agents.defaults.model.primary "$PRIMARY_MODEL"
+
+if [[ "$SET_ZEROGPU_AS_DEFAULT" == "1" ]]; then
+  openclaw config set agents.defaults.model.primary "$PRIMARY_MODEL"
+else
+  echo "Leaving existing primary model unchanged."
+  echo "Set SET_ZEROGPU_AS_DEFAULT=1 if you want ${PRIMARY_MODEL} as the global default."
+fi
 
 if [[ "${SKIP_GATEWAY_RESTART:-0}" == "1" ]]; then
   echo "Skipped gateway restart because SKIP_GATEWAY_RESTART=1."
@@ -70,7 +77,11 @@ fi
 
 echo "OpenCLAW configured for ZeroGPU."
 echo "Provider: models.providers.zerogpu"
-echo "Primary model: ${PRIMARY_MODEL}"
+if [[ "$SET_ZEROGPU_AS_DEFAULT" == "1" ]]; then
+  echo "Primary model: ${PRIMARY_MODEL}"
+else
+  echo "Primary model: unchanged"
+fi
 echo "Credentials are stored in OpenCLAW provider config, not in the hosted adapter."
 echo
 echo "Verify with:"

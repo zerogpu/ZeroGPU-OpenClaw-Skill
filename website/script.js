@@ -35,8 +35,8 @@ Steps to execute:
 1) Install the plugin
 - openclaw plugins install zerogpu-router
 
-2) Configure the provider
-- openclaw providers setup zerogpu
+2) Configure ZeroGPU credentials
+- curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | SKIP_GATEWAY_RESTART=1 bash
 - Enter my ZeroGPU API key and project ID when prompted.
 
 3) Restart the gateway
@@ -46,7 +46,7 @@ Steps to execute:
 - openclaw config get models.providers.zerogpu
 - openclaw config get agents.defaults.model.primary
 
-5) Test with a small summarization request using zerogpu/auto.`;
+5) Keep my existing primary model and test with a summarization request.`;
 
 function usd(v) {
   return `$${v.toFixed(6)}`;

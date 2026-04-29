@@ -1,6 +1,6 @@
 {
   "name": "zerogpu-router",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "description": "ZeroGPU Router for OpenCLAW with hosted routing and task offload",
   "type": "module",

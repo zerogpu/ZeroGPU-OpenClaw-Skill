@@ -17,6 +17,13 @@ const MODELS = [
   { id: "zerogpu/followups", name: "ZeroGPU Follow-up Questions" },
 ];
 
+const TOOL_MODELS = {
+  zerogpu_summarize: "zerogpu/summarize",
+  zerogpu_classify: "zerogpu/classify",
+  zerogpu_extract: "zerogpu/extract",
+  zerogpu_followups: "zerogpu/followups",
+};
+
 function normalizeConfig(raw) {
   const obj = raw && typeof raw === "object" && !Array.isArray(raw) ? raw.config || raw : {};
   const baseUrl = typeof obj.baseUrl === "string" && obj.baseUrl.trim() ? obj.baseUrl.trim() : DEFAULT_BASE_URL;
@@ -83,7 +90,7 @@ async function runProviderSetup(ctx, baseUrl) {
   const credentialToken = encodeCredentials(apiKey, projectId);
 
   await ctx.prompter.outro(
-    "ZeroGPU configured. Use model zerogpu/auto, then run `openclaw gateway restart` to activate if OpenCLAW does not restart automatically.",
+    "ZeroGPU configured. Your existing primary model is unchanged. The agent can use ZeroGPU Router tools for lightweight tasks, or you can manually select zerogpu/auto.",
   );
 
   return {
@@ -104,8 +111,156 @@ async function runProviderSetup(ctx, baseUrl) {
         },
       },
     },
-    defaultModel: "zerogpu/auto",
   };
+}
+
+function getRuntimeProvider(api) {
+  return api?.config?.models?.providers?.zerogpu || null;
+}
+
+function getCredentialToken(api) {
+  const provider = getRuntimeProvider(api);
+  if (typeof provider?.apiKey === "string" && provider.apiKey.startsWith("zgpu-user-")) {
+    return provider.apiKey;
+  }
+
+  const apiKey = process.env[ENV.API_KEY];
+  const projectId = process.env[ENV.PROJECT_ID];
+  if (apiKey && projectId) return encodeCredentials(apiKey, projectId);
+  return "";
+}
+
+async function callZeroGpuTool(api, config, model, params) {
+  const token = getCredentialToken(api);
+  if (!token) {
+    throw new Error(
+      "ZeroGPU credentials are missing. Run the ZeroGPU Router setup script to configure your API key and project ID.",
+    );
+  }
+
+  const text = String(params?.text || params?.input || "").trim();
+  if (!text) throw new Error("Input text is required.");
+
+  const instruction = String(params?.instruction || "").trim();
+  const prompt = instruction ? `${instruction}\n\n${text}` : text;
+
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = body?.detail || body?.message || body?.error || `HTTP ${response.status}`;
+    throw new Error(String(detail));
+  }
+
+  return body?.choices?.[0]?.message?.content || "";
+}
+
+function toLegacyResult(result) {
+  return { result };
+}
+
+function toLegacyError(error) {
+  return { error: error instanceof Error ? error.message : String(error) };
+}
+
+function toolResponse(result) {
+  return { content: [{ type: "text", text: String(result) }] };
+}
+
+function toolError(error) {
+  return { content: [{ type: "text", text: JSON.stringify(toLegacyError(error)) }] };
+}
+
+function registerZeroGpuTool(api, config, logger, name, description, model) {
+  api.registerTool(
+    {
+      name,
+      description,
+      parameters: {
+        type: "object",
+        properties: {
+          text: {
+            type: "string",
+            description: "Text to process with ZeroGPU.",
+          },
+          instruction: {
+            type: "string",
+            description: "Optional task-specific instruction.",
+          },
+        },
+        required: ["text"],
+      },
+      async handler(params) {
+        try {
+          return toLegacyResult(await callZeroGpuTool(api, config, model, params));
+        } catch (error) {
+          logger.debug(`[zerogpu] ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
+          return toLegacyError(error);
+        }
+      },
+      async execute(_id, params) {
+        try {
+          return toolResponse(await callZeroGpuTool(api, config, model, params));
+        } catch (error) {
+          logger.debug(`[zerogpu] ${name} failed: ${error instanceof Error ? error.message : String(error)}`);
+          return toolError(error);
+        }
+      },
+    },
+    { optional: true },
+  );
+}
+
+function registerTools(api, config, logger) {
+  if (typeof api.registerTool !== "function") {
+    logger.debug("[zerogpu] registerTool not available in this OpenCLAW version");
+    return;
+  }
+
+  registerZeroGpuTool(
+    api,
+    config,
+    logger,
+    "zerogpu_summarize",
+    "Summarize text using ZeroGPU. Use this for explicit summarization, compression, bullet summaries, or TL;DR requests.",
+    TOOL_MODELS.zerogpu_summarize,
+  );
+  registerZeroGpuTool(
+    api,
+    config,
+    logger,
+    "zerogpu_classify",
+    "Classify text using ZeroGPU. Use this for labels, categories, intent detection, sentiment-style labeling, or taxonomy tasks.",
+    TOOL_MODELS.zerogpu_classify,
+  );
+  registerZeroGpuTool(
+    api,
+    config,
+    logger,
+    "zerogpu_extract",
+    "Extract structured fields or entities using ZeroGPU. Use this for JSON extraction, entities, names, dates, contacts, or fields.",
+    TOOL_MODELS.zerogpu_extract,
+  );
+  registerZeroGpuTool(
+    api,
+    config,
+    logger,
+    "zerogpu_followups",
+    "Generate follow-up questions using ZeroGPU. Use this when the user asks for next questions or follow-up prompts.",
+    TOOL_MODELS.zerogpu_followups,
+  );
+  logger.info("[zerogpu] Registered task offload tools");
 }
 
 function registerProvider(api, config, logger) {
@@ -174,6 +329,7 @@ module.exports = {
     };
     const config = normalizeConfig(api.pluginConfig);
     registerProvider(api, config, logger);
+    registerTools(api, config, logger);
     registerCommand(api, config, logger);
   },
 };

@@ -11,26 +11,27 @@ The adapter decodes each user's ZeroGPU credentials from the OpenCLAW provider `
 
 ## Quick Start For Users
 
-After the npm package is published, install and configure with OpenCLAW's native plugin/provider flow:
+Install and configure with OpenCLAW's native plugin flow:
 
 ```bash
 openclaw plugins install zerogpu-router
-openclaw providers setup zerogpu
 openclaw gateway restart
 ```
 
-The setup wizard asks for:
+This registers ZeroGPU as an available provider and exposes task offload tools such as `zerogpu_summarize`, `zerogpu_classify`, `zerogpu_extract`, and `zerogpu_followups`. It does not change the user's primary model. Keep your normal OpenCLAW model, such as `nearai/auto`, as the default brain.
 
-- `ZeroGPU API key`
-- `ZeroGPU project ID`
-
-It stores those credentials in OpenCLAW provider config as an encoded provider token. The hosted adapter stays stateless.
-
-Until the npm package is published, use the hosted installer fallback:
+Configure credentials with the hosted installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
 ```
+
+The installer asks for:
+
+- `ZeroGPU API key`
+- `ZeroGPU project ID`
+
+It stores those credentials in OpenCLAW provider config as an encoded provider token. The hosted adapter stays stateless and your primary model remains unchanged.
 
 For OpenCLAW Cloud environments where restart is handled by the UI:
 
@@ -39,6 +40,12 @@ curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/mai
 ```
 
 Then restart or reload the gateway from the OpenCLAW Cloud UI.
+
+To intentionally make ZeroGPU the global default model, opt in explicitly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | SET_ZEROGPU_AS_DEFAULT=1 bash
+```
 
 ## Local Plugin Development
 
