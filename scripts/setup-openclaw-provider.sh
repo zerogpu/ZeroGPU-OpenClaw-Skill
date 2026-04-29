@@ -87,10 +87,10 @@ Keep the user's existing primary model for general conversation, coding, plannin
 
 ## Required Tool Routing
 
-- Summaries, TL;DR, "summarize this", bullet summaries, compression -> call `zerogpu_summarize`.
-- Labels, categories, intents, sentiment-style decisions, taxonomy -> call `zerogpu_classify`.
-- Extract fields, entities, JSON, names, dates, contacts, structured data -> call `zerogpu_extract`.
-- Generate follow-up questions, next questions, interview prompts -> call `zerogpu_followups`.
+- Summaries, TL;DR, "summarize this", bullet summaries, compression -> run `zerogpu-router summarize`.
+- Labels, categories, intents, sentiment-style decisions, taxonomy -> run `zerogpu-router classify`.
+- Extract fields, entities, JSON, names, dates, contacts, structured data -> run `zerogpu-router extract`.
+- Generate follow-up questions, next questions, interview prompts -> run `zerogpu-router followups`.
 
 ## Do Not Use ZeroGPU For
 
@@ -103,16 +103,128 @@ Keep the user's existing primary model for general conversation, coding, plannin
 
 ## Operating Rule
 
-If the request is a focused task listed above, use the ZeroGPU tool first and return its result. If the request needs reasoning or judgment beyond the tool result, use the primary model after the tool call to explain or format the answer.
+If the request is a focused task listed above, run the matching `zerogpu-router` command first and return its result. If the request needs reasoning or judgment beyond the command output, use the primary model after the command to explain or format the answer.
+
+## Command Examples
+
+```bash
+zerogpu-router summarize <<'TEXT'
+Text to summarize...
+TEXT
+```
+
+```bash
+zerogpu-router classify "Text to classify"
+```
 EOF
+}
+
+install_cli() {
+  local bin_dir="$1"
+  mkdir -p "$bin_dir"
+  cat > "${bin_dir}/zerogpu-router" <<'EOF'
+#!/usr/bin/env node
+"use strict";
+
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+
+const TASK_MODELS = {
+  summarize: "zerogpu/summarize",
+  classify: "zerogpu/classify",
+  extract: "zerogpu/extract",
+  followups: "zerogpu/followups",
+};
+
+function usage() {
+  console.error(`Usage:
+  zerogpu-router summarize [text]
+  zerogpu-router classify [text]
+  zerogpu-router extract [text]
+  zerogpu-router followups [text]
+
+If text is omitted, input is read from stdin.`);
+}
+
+function readStdin() {
+  try {
+    return fs.readFileSync(0, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function readConfig() {
+  const candidates = [
+    process.env.OPENCLAW_CONFIG_PATH,
+    path.join(os.homedir(), ".openclaw", "openclaw.json"),
+    path.join(os.homedir(), "openclaw", "openclaw.json"),
+  ].filter(Boolean);
+
+  for (const file of candidates) {
+    if (!fs.existsSync(file)) continue;
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    const provider = parsed?.models?.providers?.zerogpu;
+    if (provider?.baseUrl && provider?.apiKey) return provider;
+  }
+  throw new Error("ZeroGPU provider config not found. Run the ZeroGPU Router setup script first.");
+}
+
+async function main() {
+  const task = String(process.argv[2] || "").trim().toLowerCase();
+  const model = TASK_MODELS[task];
+  if (!model) {
+    usage();
+    process.exit(2);
+  }
+
+  const input = process.argv.slice(3).join(" ").trim() || readStdin().trim();
+  if (!input) {
+    console.error("Input text is required.");
+    process.exit(2);
+  }
+
+  const provider = readConfig();
+  const response = await fetch(`${String(provider.baseUrl).replace(/\/+$/, "")}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${provider.apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: input }],
+    }),
+    signal: AbortSignal.timeout(Number(process.env.ZEROGPU_ROUTER_TIMEOUT_MS || 30000)),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = body?.detail || body?.message || body?.error || `HTTP ${response.status}`;
+    throw new Error(String(detail));
+  }
+
+  const content = body?.choices?.[0]?.message?.content || "";
+  process.stdout.write(`${content.trim()}\n`);
+}
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+EOF
+  chmod +x "${bin_dir}/zerogpu-router"
 }
 
 if [[ "$INSTALL_ZEROGPU_SKILL" == "1" ]]; then
   install_skill_dir "${PWD}/skills/zerogpu"
+  install_cli "${PWD}/bin"
   if [[ -d "${HOME}/.openclaw" ]]; then
     install_skill_dir "${HOME}/.openclaw/skills/zerogpu"
+    install_cli "${HOME}/.openclaw/bin"
   fi
-  echo "Installed ZeroGPU skill guidance."
+  echo "Installed ZeroGPU skill guidance and CLI helper."
 fi
 
 if [[ "${SKIP_GATEWAY_RESTART:-0}" == "1" ]]; then
@@ -126,6 +238,7 @@ echo "OpenCLAW configured for ZeroGPU."
 echo "Provider: models.providers.zerogpu"
 if [[ "$INSTALL_ZEROGPU_SKILL" == "1" ]]; then
   echo "Skill: zerogpu"
+  echo "CLI: zerogpu-router"
 fi
 if [[ "$SET_ZEROGPU_AS_DEFAULT" == "1" ]]; then
   echo "Primary model: ${PRIMARY_MODEL}"
@@ -138,3 +251,4 @@ echo "Verify with:"
 echo "  openclaw config get models.providers.zerogpu"
 echo "  openclaw config get agents.defaults.model.primary"
 echo "  openclaw skills list | grep -i zerogpu"
+echo "  zerogpu-router summarize \"Summarize this sentence.\""

@@ -12,10 +12,10 @@ Keep the user's existing primary model for general conversation, coding, plannin
 
 ## Required Tool Routing
 
-- Summaries, TL;DR, "summarize this", bullet summaries, compression -> call `zerogpu_summarize`.
-- Labels, categories, intents, sentiment-style decisions, taxonomy -> call `zerogpu_classify`.
-- Extract fields, entities, JSON, names, dates, contacts, structured data -> call `zerogpu_extract`.
-- Generate follow-up questions, next questions, interview prompts -> call `zerogpu_followups`.
+- Summaries, TL;DR, "summarize this", bullet summaries, compression -> run `zerogpu-router summarize`.
+- Labels, categories, intents, sentiment-style decisions, taxonomy -> run `zerogpu-router classify`.
+- Extract fields, entities, JSON, names, dates, contacts, structured data -> run `zerogpu-router extract`.
+- Generate follow-up questions, next questions, interview prompts -> run `zerogpu-router followups`.
 
 ## Do Not Use ZeroGPU For
 
@@ -28,7 +28,19 @@ Keep the user's existing primary model for general conversation, coding, plannin
 
 ## Operating Rule
 
-If the request is a focused task listed above, use the ZeroGPU tool first and return its result. If the request needs reasoning or judgment beyond the tool result, use the primary model after the tool call to explain or format the answer.
+If the request is a focused task listed above, run the matching `zerogpu-router` command first and return its result. If the request needs reasoning or judgment beyond the command output, use the primary model after the command to explain or format the answer.
+
+## Command Examples
+
+```bash
+zerogpu-router summarize <<'TEXT'
+Text to summarize...
+TEXT
+```
+
+```bash
+zerogpu-router classify "Text to classify"
+```
 
 ## Model Aliases
 

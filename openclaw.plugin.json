@@ -1,7 +1,7 @@
 {
   "id": "zerogpu-router",
   "name": "ZeroGPU Router",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Route OpenCLAW lightweight tasks to ZeroGPU through a hosted OpenAI-compatible provider adapter.",
   "author": "ZeroGPU",
   "homepage": "https://github.com/zerogpu/ZeroGPU-OpenClaw-Plugin",
