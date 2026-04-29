@@ -11,7 +11,7 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-ADAPTER_BASE_URL="${ADAPTER_BASE_URL:-https://zerogpu-openclaw-plugin.onrender.com/v1}"
+ZEROGPU_API_URL="${ZEROGPU_API_URL:-https://api.zerogpu.ai/v1/responses}"
 PRIMARY_MODEL="${PRIMARY_MODEL:-zerogpu/auto}"
 SET_ZEROGPU_AS_DEFAULT="${SET_ZEROGPU_AS_DEFAULT:-0}"
 INSTALL_ZEROGPU_SKILL="${INSTALL_ZEROGPU_SKILL:-1}"
@@ -32,29 +32,39 @@ if [[ -z "$ZEROGPU_API_KEY" || -z "$ZEROGPU_PROJECT_ID" ]]; then
   exit 1
 fi
 
-credential_token="$(
-  ZEROGPU_API_KEY="$ZEROGPU_API_KEY" ZEROGPU_PROJECT_ID="$ZEROGPU_PROJECT_ID" node -e '
+CONFIG_DIR="${HOME}/.openclaw/zerogpu"
+CONFIG_PATH="${CONFIG_DIR}/config.json"
+mkdir -p "$CONFIG_DIR"
+chmod 700 "$CONFIG_DIR"
+
+ZEROGPU_API_KEY="$ZEROGPU_API_KEY" \
+ZEROGPU_PROJECT_ID="$ZEROGPU_PROJECT_ID" \
+ZEROGPU_API_URL="$ZEROGPU_API_URL" \
+node -e '
+const fs = require("node:fs");
+const path = process.argv[1];
 const payload = {
   apiKey: process.env.ZEROGPU_API_KEY,
   projectId: process.env.ZEROGPU_PROJECT_ID,
+  apiUrl: process.env.ZEROGPU_API_URL,
 };
-process.stdout.write("zgpu-user-" + Buffer.from(JSON.stringify(payload)).toString("base64url"));
-'
-)"
+fs.writeFileSync(path, JSON.stringify(payload, null, 2), { mode: 0o600 });
+' "$CONFIG_PATH"
 
 provider_json="$(cat <<EOF
 {
-  "baseUrl": "${ADAPTER_BASE_URL}",
+  "baseUrl": "https://api.zerogpu.ai/v1",
   "api": "openai-completions",
-  "apiKey": "${credential_token}",
+  "apiKey": "${ZEROGPU_API_KEY}",
+  "headers": {
+    "x-api-key": "${ZEROGPU_API_KEY}",
+    "x-project-id": "${ZEROGPU_PROJECT_ID}"
+  },
   "models": [
-    { "id": "zerogpu/auto", "name": "ZeroGPU Auto" },
-    { "id": "zerogpu/chat", "name": "ZeroGPU Chat" },
-    { "id": "zerogpu/chat-thinking", "name": "ZeroGPU Chat Thinking" },
-    { "id": "zerogpu/summarize", "name": "ZeroGPU Summarize" },
-    { "id": "zerogpu/classify", "name": "ZeroGPU Classify" },
-    { "id": "zerogpu/extract", "name": "ZeroGPU Extract" },
-    { "id": "zerogpu/followups", "name": "ZeroGPU Follow-up Questions" }
+    { "id": "zlm-v1-iab-classify-edge", "name": "ZeroGPU IAB Classify" },
+    { "id": "zlm-v1-followup-questions-edge", "name": "ZeroGPU Follow-up Questions" },
+    { "id": "t5-small", "name": "ZeroGPU Summarize" },
+    { "id": "gliner2-base-v1", "name": "ZeroGPU Extract" }
   ]
 }
 EOF
@@ -131,11 +141,13 @@ const os = require("node:os");
 const path = require("node:path");
 
 const TASK_MODELS = {
-  summarize: "zerogpu/summarize",
-  classify: "zerogpu/classify",
-  extract: "zerogpu/extract",
-  followups: "zerogpu/followups",
+  summarize: "t5-small",
+  classify: "zlm-v1-iab-classify-edge",
+  extract: "gliner2-base-v1",
+  followups: "zlm-v1-followup-questions-edge",
 };
+
+const DEFAULT_API_URL = "https://api.zerogpu.ai/v1/responses";
 
 function usage() {
   console.error(`Usage:
@@ -157,18 +169,26 @@ function readStdin() {
 
 function readConfig() {
   const candidates = [
-    process.env.OPENCLAW_CONFIG_PATH,
-    path.join(os.homedir(), ".openclaw", "openclaw.json"),
-    path.join(os.homedir(), "openclaw", "openclaw.json"),
+    process.env.ZEROGPU_ROUTER_CONFIG,
+    path.join(os.homedir(), ".openclaw", "zerogpu", "config.json"),
+    path.join(os.homedir(), "openclaw", "zerogpu", "config.json"),
   ].filter(Boolean);
 
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
     const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-    const provider = parsed?.models?.providers?.zerogpu;
-    if (provider?.baseUrl && provider?.apiKey) return provider;
+    if (parsed?.apiKey && parsed?.projectId) return parsed;
   }
-  throw new Error("ZeroGPU provider config not found. Run the ZeroGPU Router setup script first.");
+
+  if (process.env.ZEROGPU_API_KEY && process.env.ZEROGPU_PROJECT_ID) {
+    return {
+      apiKey: process.env.ZEROGPU_API_KEY,
+      projectId: process.env.ZEROGPU_PROJECT_ID,
+      apiUrl: process.env.ZEROGPU_API_URL || DEFAULT_API_URL,
+    };
+  }
+
+  throw new Error("ZeroGPU credentials not found. Run the ZeroGPU Router setup script first.");
 }
 
 async function main() {
@@ -185,16 +205,18 @@ async function main() {
     process.exit(2);
   }
 
-  const provider = readConfig();
-  const response = await fetch(`${String(provider.baseUrl).replace(/\/+$/, "")}/chat/completions`, {
+  const config = readConfig();
+  const response = await fetch(config.apiUrl || DEFAULT_API_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${provider.apiKey}`,
+      "x-api-key": config.apiKey,
+      "x-project-id": config.projectId,
     },
     body: JSON.stringify({
+      text: { format: { type: "text" } },
+      input: [{ role: "user", content: input }],
       model,
-      messages: [{ role: "user", content: input }],
     }),
     signal: AbortSignal.timeout(Number(process.env.ZEROGPU_ROUTER_TIMEOUT_MS || 30000)),
   });
@@ -205,7 +227,12 @@ async function main() {
     throw new Error(String(detail));
   }
 
-  const content = body?.choices?.[0]?.message?.content || "";
+  const content =
+    body?.choices?.[0]?.message?.content ||
+    body?.output_text ||
+    body?.output?.flatMap?.((item) => item?.content || [])?.find?.((chunk) => typeof chunk?.text === "string")?.text ||
+    body?.text ||
+    JSON.stringify(body);
   process.stdout.write(`${content.trim()}\n`);
 }
 
@@ -235,7 +262,8 @@ elif ! openclaw gateway restart; then
 fi
 
 echo "OpenCLAW configured for ZeroGPU."
-echo "Provider: models.providers.zerogpu"
+echo "Credentials: ${CONFIG_PATH}"
+echo "Provider: models.providers.zerogpu (direct ZeroGPU API)"
 if [[ "$INSTALL_ZEROGPU_SKILL" == "1" ]]; then
   echo "Skill: zerogpu"
   echo "CLI: zerogpu-router"
@@ -245,7 +273,7 @@ if [[ "$SET_ZEROGPU_AS_DEFAULT" == "1" ]]; then
 else
   echo "Primary model: unchanged"
 fi
-echo "Credentials are stored in OpenCLAW provider config, not in the hosted adapter."
+echo "Credentials are stored locally at ${CONFIG_PATH}."
 echo
 echo "Verify with:"
 echo "  openclaw config get models.providers.zerogpu"

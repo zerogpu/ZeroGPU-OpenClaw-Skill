@@ -1,13 +1,14 @@
 # ZeroGPU Router
 
-Hosted OpenAI-compatible provider adapter for routing OpenCLAW tasks to ZeroGPU.
+OpenCLAW skill and CLI for routing focused tasks directly to the ZeroGPU API.
 
-OpenCLAW talks to this project through standard provider endpoints:
+The main production path does not require a hosted adapter. The `zerogpu-router` CLI calls:
 
-- `GET /v1/models`
-- `POST /v1/chat/completions`
+```text
+https://api.zerogpu.ai/v1/responses
+```
 
-The adapter decodes each user's ZeroGPU credentials from the OpenCLAW provider `apiKey`, then forwards requests to ZeroGPU with `x-api-key` and `x-project-id`. Render or any shared host does not need user-specific ZeroGPU secrets.
+with the user's `x-api-key` and `x-project-id` headers.
 
 ## Quick Start For Users
 
@@ -31,7 +32,7 @@ The installer asks for:
 - `ZeroGPU API key`
 - `ZeroGPU project ID`
 
-It stores those credentials in OpenCLAW provider config as an encoded provider token, and installs local `zerogpu` skill guidance so the normal agent knows when to call the offload tools. The hosted adapter stays stateless and your primary model remains unchanged.
+It stores those credentials locally in `~/.openclaw/zerogpu/config.json`, and installs local `zerogpu` skill guidance so the normal agent knows when to call the offload CLI. Your primary model remains unchanged.
 
 For OpenCLAW Cloud environments where restart is handled by the UI:
 
@@ -46,6 +47,7 @@ Verify the skill and provider are visible:
 ```bash
 openclaw config get models.providers.zerogpu
 openclaw skills list | grep -i zerogpu
+zerogpu-router summarize "Summarize this sentence."
 ```
 
 To intentionally make ZeroGPU the global default model, opt in explicitly:
@@ -73,9 +75,9 @@ ZEROGPU_PROJECT_ID="YOUR_ZEROGPU_PROJECT_ID" \
 npm run setup:openclaw
 ```
 
-## Deploy The Adapter
+## Optional Hosted Adapter
 
-Render is the fastest hosted path:
+The Render adapter is optional/legacy. It is useful only if you want a shared OpenAI-compatible bridge endpoint with dashboard events:
 
 1. Create a Render Web Service from this repo.
 2. Use build command `npm install`.

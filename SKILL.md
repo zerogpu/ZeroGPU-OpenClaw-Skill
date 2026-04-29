@@ -22,11 +22,14 @@ Prefer the configured OpenCLAW provider model IDs:
 - `zerogpu/chat`
 - `zerogpu/chat-thinking`
 
-OpenCLAW should call the hosted adapter through:
+OpenCLAW should prefer the local CLI installed by the setup script:
 
-- `POST /v1/chat/completions`
+- `zerogpu-router summarize`
+- `zerogpu-router classify`
+- `zerogpu-router extract`
+- `zerogpu-router followups`
 
-The legacy endpoint remains available only for compatibility:
+The hosted adapter endpoint remains available only for compatibility:
 
 - `POST /v1/zerogpu/chat/completions`
 
@@ -45,4 +48,4 @@ Avoid ZeroGPU for deep multi-step reasoning, long creative writing, or tasks tha
 
 ## Credentials
 
-Users provide `ZEROGPU_API_KEY` and `ZEROGPU_PROJECT_ID` during setup. The setup script stores an encoded token in OpenCLAW provider config, and the hosted adapter forwards credentials per request. Do not store user ZeroGPU credentials in shared hosting environment variables.
+Users provide `ZEROGPU_API_KEY` and `ZEROGPU_PROJECT_ID` during setup. The setup script stores credentials locally in the user's OpenCLAW state directory, and the CLI forwards them directly to ZeroGPU as `x-api-key` and `x-project-id`.

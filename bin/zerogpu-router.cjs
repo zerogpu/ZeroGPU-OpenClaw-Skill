@@ -6,11 +6,13 @@ const os = require("node:os");
 const path = require("node:path");
 
 const TASK_MODELS = {
-  summarize: "zerogpu/summarize",
-  classify: "zerogpu/classify",
-  extract: "zerogpu/extract",
-  followups: "zerogpu/followups",
+  summarize: "t5-small",
+  classify: "zlm-v1-iab-classify-edge",
+  extract: "gliner2-base-v1",
+  followups: "zlm-v1-followup-questions-edge",
 };
+
+const DEFAULT_API_URL = "https://api.zerogpu.ai/v1/responses";
 
 function usage() {
   console.error(`Usage:
@@ -32,18 +34,26 @@ function readStdin() {
 
 function readConfig() {
   const candidates = [
-    process.env.OPENCLAW_CONFIG_PATH,
-    path.join(os.homedir(), ".openclaw", "openclaw.json"),
-    path.join(os.homedir(), "openclaw", "openclaw.json"),
+    process.env.ZEROGPU_ROUTER_CONFIG,
+    path.join(os.homedir(), ".openclaw", "zerogpu", "config.json"),
+    path.join(os.homedir(), "openclaw", "zerogpu", "config.json"),
   ].filter(Boolean);
 
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
     const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-    const provider = parsed?.models?.providers?.zerogpu;
-    if (provider?.baseUrl && provider?.apiKey) return provider;
+    if (parsed?.apiKey && parsed?.projectId) return parsed;
   }
-  throw new Error("ZeroGPU provider config not found. Run the ZeroGPU Router setup script first.");
+
+  if (process.env.ZEROGPU_API_KEY && process.env.ZEROGPU_PROJECT_ID) {
+    return {
+      apiKey: process.env.ZEROGPU_API_KEY,
+      projectId: process.env.ZEROGPU_PROJECT_ID,
+      apiUrl: process.env.ZEROGPU_API_URL || DEFAULT_API_URL,
+    };
+  }
+
+  throw new Error("ZeroGPU credentials not found. Run the ZeroGPU Router setup script first.");
 }
 
 async function main() {
@@ -60,16 +70,18 @@ async function main() {
     process.exit(2);
   }
 
-  const provider = readConfig();
-  const response = await fetch(`${String(provider.baseUrl).replace(/\/+$/, "")}/chat/completions`, {
+  const config = readConfig();
+  const response = await fetch(config.apiUrl || DEFAULT_API_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${provider.apiKey}`,
+      "x-api-key": config.apiKey,
+      "x-project-id": config.projectId,
     },
     body: JSON.stringify({
+      text: { format: { type: "text" } },
+      input: [{ role: "user", content: input }],
       model,
-      messages: [{ role: "user", content: input }],
     }),
     signal: AbortSignal.timeout(Number(process.env.ZEROGPU_ROUTER_TIMEOUT_MS || 30000)),
   });
@@ -80,7 +92,12 @@ async function main() {
     throw new Error(String(detail));
   }
 
-  const content = body?.choices?.[0]?.message?.content || "";
+  const content =
+    body?.choices?.[0]?.message?.content ||
+    body?.output_text ||
+    body?.output?.flatMap?.((item) => item?.content || [])?.find?.((chunk) => typeof chunk?.text === "string")?.text ||
+    body?.text ||
+    JSON.stringify(body);
   process.stdout.write(`${content.trim()}\n`);
 }
 

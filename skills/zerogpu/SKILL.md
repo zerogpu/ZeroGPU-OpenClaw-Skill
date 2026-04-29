@@ -71,8 +71,8 @@ Then configure credentials:
 curl -fsSL https://raw.githubusercontent.com/zerogpu/ZeroGPU-OpenClaw-Plugin/main/scripts/setup-openclaw-provider.sh | bash
 ```
 
-The setup script asks for the user's ZeroGPU API key and project ID, then writes a standard OpenAI-compatible provider entry for the hosted adapter without changing the primary model.
+The setup script asks for the user's ZeroGPU API key and project ID, stores them locally, and leaves the primary model unchanged.
 
 ## Privacy
 
-The hosted adapter does not store user credentials. Credentials are encoded into the user's OpenCLAW provider config and sent to the adapter per request.
+Credentials are stored locally in the user's OpenCLAW state directory and sent directly to ZeroGPU by the `zerogpu-router` CLI.

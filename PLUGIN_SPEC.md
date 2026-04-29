@@ -1,17 +1,23 @@
-# ZeroGPU Router Provider Spec
+# ZeroGPU Router Spec
 
-## Primary Endpoints
+## Primary Flow
 
-- `GET /health`
-- `GET /v1/models`
-- `POST /v1/chat/completions`
+The OpenCLAW skill calls the local `zerogpu-router` CLI. The CLI calls ZeroGPU directly:
 
-## Compatibility Endpoints
+- `POST https://api.zerogpu.ai/v1/responses`
+- `x-api-key: <ZEROGPU_API_KEY>`
+- `x-project-id: <ZEROGPU_PROJECT_ID>`
 
-- `POST /v1/zerogpu/chat/completions`
-- `GET /v1/zerogpu/models`
-- `GET /dashboard/events?limit=50`
-- `GET /dashboard/summary`
+Credentials are stored locally at:
+
+- `~/.openclaw/zerogpu/config.json`
+
+## CLI Commands
+
+- `zerogpu-router summarize`
+- `zerogpu-router classify`
+- `zerogpu-router extract`
+- `zerogpu-router followups`
 
 ## Request
 
@@ -28,31 +34,22 @@
 }
 ```
 
-## Authentication
+## Optional Hosted Adapter
 
-The hosted adapter accepts either:
+The Render adapter remains available for legacy OpenAI-compatible provider experiments:
 
-- `Authorization: Bearer zgpu-user-<base64url-json>` from OpenCLAW provider config.
-- `x-api-key` and `x-project-id` headers for curl/debug.
-
-The encoded credential JSON shape is:
-
-```json
-{
-  "apiKey": "zgpu-...",
-  "projectId": "..."
-}
-```
+- `GET /health`
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+- `GET /dashboard/events?limit=50`
+- `GET /dashboard/summary`
 
 ## Runtime Behavior
 
-1. Decode per-request ZeroGPU credentials.
-2. Resolve provider aliases such as `zerogpu/auto` or `zerogpu/summarize`.
-3. Fetch or fallback to the local ZeroGPU model catalog.
-4. Pick a compatible model for the task.
-5. Call ZeroGPU `POST /v1/responses`.
-6. Return normalized OpenAI-compatible chat completion output.
-7. Append a local tracking event for dashboard summaries.
+1. Read local credentials.
+2. Choose a ZeroGPU model for the task.
+3. Call ZeroGPU `POST /v1/responses`.
+4. Return text output to OpenCLAW.
 
 ## Tracking Event Schema
 
